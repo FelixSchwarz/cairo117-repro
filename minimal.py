@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+from pathlib import Path
 
 import cairocffi as cairo
 
@@ -9,14 +12,16 @@ from weasyprint.fonts import FontConfiguration
 from weasyprint.formatting_structure.build import build_formatting_structure
 from weasyprint.layout import layout_document
 from weasyprint.stacking import StackingContext
-from weasyprint.tests.test_draw import parse_pixels, assert_pixels_equal
+from weasyprint.tests.test_draw import parse_pixels, assert_pixels_equal,\
+    write_png
 from weasyprint.tests.testing_utils import FakeHTML, resource_filename
 from weasyprint.formatting_structure import boxes
 
 
-def test_float_inline():
+def render_minimal():
     cairo_version = cairo.cairo_version()
-    print(cairo_version)
+    test_name = 'minimal'
+
     html = '''
       <style>
         @font-face {src: url(AHEM____.TTF); font-family: ahem}
@@ -33,25 +38,34 @@ def test_float_inline():
           line-height: 1;
           margin: 1px;
           overflow: hidden;
-          width: 3.5em;
         }
       </style>
-      <div>abcde</div>
-      <div style="white-space: nowrap">a bcde</div>'''
+      <div>ab</div>'''
+    height = 7
+    width = 9
     pixels = render(html)
+    png_filename = write_png(f'{test_name}-{cairo_version}', pixels, width, height)
 
-    expected_width = 9
-    expected_height = 7
-    expected_pixels = b''.join(parse_pixels('''
+    from PIL import Image
+    img = Image.open(png_filename)
+    big_img = img.resize((width * 30, height * 30), Image.NEAREST)
+    result_path = Path(png_filename)
+    big_img.save(result_path.name)
+    result_path.unlink()
+
+    expected_pattern = '''
         _________
-        _RRRRRRR_
-        _RRRRRRR_
+        _RRRR____
+        _RRRR____
         _________
-        _RR__RRR_
-        _RR__RRR_
+        _________
+        _________
         _________
     '''
-    ))
+    _lines = expected_pattern.strip().split('\n')
+    expected_width = len(_lines[0].strip())
+    expected_height = len(_lines)
+    expected_pixels = b''.join(parse_pixels(expected_pattern))
     assert_pixels_equal(
         'reproducer2', expected_width, expected_height, pixels, expected_pixels)
     print('success!')
@@ -139,5 +153,5 @@ def draw_stacking_context(context, stacking_context, enable_hinting):
 
 
 if __name__ == '__main__':
-    test_float_inline()
+    render_minimal()
 
